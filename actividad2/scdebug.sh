@@ -5,6 +5,7 @@ prog=
 argumentos=
 argumento1=
 argumento2=
+nattch=
 TITLE="Script 1"
 FICHERO="./scdebug/$prog"
 UUIDGEN=$(uuidgen)
