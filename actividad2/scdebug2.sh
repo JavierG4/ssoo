@@ -11,6 +11,8 @@ UUIDGEN=$(uuidgen)
 nattch=
 vall_aceptado=
 v_aceptado=
+nattch_procs=()
+pattch_procs=()
 ##### Estilos
 #PID=$(ps -u | sort -n -k10 -r | grep $prog$ |  tail -n1 | tr -s " " " " | cut -f2 -d" ")
 #PID3=$(ps -u | tr -s " " " " | sort -n -k10 -r | grep $prog$ | head -n1 | cut -d " " -f2)
@@ -34,13 +36,13 @@ findpid()
 
 usage()
 {
-  echo scdebug [-h] [-sto arg] [-v | -vall] [-nattch progtoattach] [prog [arg1 …]]
+  echo "scdebug [-h] [-sto arg] [-v | -vall] [-nattch progtoattach] [prog [arg1 …]]"
 }
 
 repositorio_request()
 {
-if [ -e ./scdebug/ ]; then
-  if [  -e ./scdebug/$1 ]; then
+if [ -e "./scdebug/" ]; then
+  if [  -e "./scdebug/$1" ]; then
     echo $TEXT_BOLD"Directorio ya creado"$TEXT_RESET
   else
     mkdir ./scdebug/$1
@@ -50,12 +52,44 @@ else
   mkdir ./scdebug/$1
 fi
 }
+
 help1()
 {
   echo " Este script requiere que le pongas argumentos del tipo myrpog argv1 argv1"
   echo " Además puedes añadir el -sto seguido de parametros que quieras usar para el strace"
   echo " Si añades -nattch seguido de [-sto arg] vas a hacer un attacth del programa"
 }
+
+func_kill()
+{
+
+}
+
+inicio()
+{
+current_user=$(whoami)
+# Usar `ps` para obtener una lista de procesos del usuario actual
+# y guardar la salida en un archivo temporal
+ps -eo pid,comm,user --sort=start_time > process_list.tmp
+# Iterar a través de la lista de procesos
+while read -r pid process_name user; do
+  # Verificar si el proceso es del usuario actual
+  if [ "$user" == "$current_user" ]; then
+    # Comprobar si el proceso está siendo trazado
+    tracer_pid=$(awk '/TracerPid/ {print $2}' /proc/$pid/status)
+    if [ "$tracer_pid" -ne 0 ]; then
+      # Obtener el nombre del proceso trazador
+      tracer_name=$(ps -p $tracer_pid -o comm=)
+      # Imprimir información del proceso trazado y trazador
+      echo "Proceso Trazado - PID: $pid, Nombre: $process_name, Tracer PID: $tracer_pid, Tracer Nombre: $tracer_name"
+    fi
+  fi
+done < process_list.tmp
+
+# Eliminar el archivo temporal
+rm process_list.tmp
+}
+
 while [ -n "$1" ]; do
   case "$1" in
     -sto)
@@ -72,11 +106,24 @@ while [ -n "$1" ]; do
       exit
     ;;
     -nattch)
-      nattch="1"
-      shift 
-      prog= $1      
       shift
+      while [ -n "$1" ]; do
+        if [[ $1 != -* ]]; then
+          findpid $1
+          nattch_procs+=($PID4)
+          shift
+        fi
+      done
       ;;
+      -pattch)
+        while [ -n "$1" ]; do
+          pattch_procs+=($PID)
+        done
+      ;;
+    -k)
+      func_kill
+    ;;
+
     -v)
       v_aceptado="1"
       shift
@@ -111,7 +158,7 @@ if [ -n "$nattch" ]; then
 fi
 
 if [ -n "$v_aceptado" ]; then
-  latest_file=$(ls -t "./scdebug/$prog/trace_$UUIDGEN.txt"/*.log | head -1)
+  latest_file=$(ls -t "./scdebug/$prog"| head -1)
   if [ -n "$latest_file" ]; then
     echo "Contenido del archivo de depuración más reciente: $latest_file"
     cat "$latest_file"
@@ -121,9 +168,9 @@ if [ -n "$v_aceptado" ]; then
 fi
 
 if [ -n "$vall_aceptado" ]; then
-  for file in $(ls -t "./scdebug/$prog/trace_$UUIDGEN.txt"/*.log); do
+  for file in $(ls -t "./scdebug/$prog"); do
     echo "Contenido del archivo de : $debug_file"
     cat $debug_file
-    echo "==============================\n"
+    echo "=============================="
   done
 fi

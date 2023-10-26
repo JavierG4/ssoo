@@ -1,0 +1,23 @@
+current_user=$(whoami)
+
+# Usar `ps` para obtener una lista de procesos del usuario actual
+# y guardar la salida en un archivo temporal
+ps -eo pid,comm,user --sort=start_time > process_list.tmp
+
+# Iterar a través de la lista de procesos
+while read -r pid process_name user; do
+  # Verificar si el proceso es del usuario actual
+  if [ "$user" == "$current_user" ]; then
+    # Comprobar si el proceso está siendo trazado
+    tracer_pid=$(awk '/TracerPid/ {print $2}' /proc/$pid/status)
+    if [ "$tracer_pid" -ne 0 ]; then
+      # Obtener el nombre del proceso trazador
+      tracer_name=$(ps -p $tracer_pid -o comm=)
+      # Imprimir información del proceso trazado y trazador
+      echo "Proceso Trazado - PID: $pid, Nombre: $process_name, Tracer PID: $tracer_pid, Tracer Nombre: $tracer_name"
+    fi
+  fi
+done < process_list.tmp
+
+# Eliminar el archivo temporal
+rm process_list.tmp
