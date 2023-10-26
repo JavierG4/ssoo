@@ -130,11 +130,13 @@ while [ -n "$1" ]; do
       v_aceptado="1"
       shift
       prog=$1
+      shift
     ;;
     -vall)
       vall_aceptado="1"
       shift
       prog=$1
+      shift
     ;;
     *)
       if [ -z "$prog" ]; then
