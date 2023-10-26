@@ -9,10 +9,11 @@ TITLE="Script 1"
 FICHERO="./scdebug/$prog"
 UUIDGEN=$(uuidgen)
 nattch=
+pattch=
 vall_aceptado=
 v_aceptado=
-nattch_procs=()
-pattch_procs=()
+nattch_lista=()
+pattch_lista=()
 ##### Estilos
 #PID=$(ps -u | sort -n -k10 -r | grep $prog$ |  tail -n1 | tr -s " " " " | cut -f2 -d" ")
 #PID3=$(ps -u | tr -s " " " " | sort -n -k10 -r | grep $prog$ | head -n1 | cut -d " " -f2)
@@ -60,34 +61,32 @@ help1()
   echo " Si añades -nattch seguido de [-sto arg] vas a hacer un attacth del programa"
 }
 
+process_name()
+{
+  proceso_nombre=$(ps -p $1 -o comm=)
+}
+
 func_kill()
 {
-
+ echo a
 }
 
 inicio()
 {
 current_user=$(whoami)
-# Usar `ps` para obtener una lista de procesos del usuario actual
-# y guardar la salida en un archivo temporal
-ps -eo pid,comm,user --sort=start_time > process_list.tmp
-# Iterar a través de la lista de procesos
-while read -r pid process_name user; do
-  # Verificar si el proceso es del usuario actual
-  if [ "$user" == "$current_user" ]; then
-    # Comprobar si el proceso está siendo trazado
-    tracer_pid=$(awk '/TracerPid/ {print $2}' /proc/$pid/status)
-    if [ "$tracer_pid" -ne 0 ]; then
-      # Obtener el nombre del proceso trazador
-      tracer_name=$(ps -p $tracer_pid -o comm=)
-      # Imprimir información del proceso trazado y trazador
-      echo "Proceso Trazado - PID: $pid, Nombre: $process_name, Tracer PID: $tracer_pid, Tracer Nombre: $tracer_name"
+  ps -eo pid,comm,user --sort=start_time > process_list.tmp
+  while read -r pid process_name user; do
+    if [ "$user" == "$current_user" ]; then
+      if [ -e "/proc/$pid/status" ]; then
+        tracer_pid=$(awk '/TracerPid/ {print $2}' /proc/$pid/status)
+        if [ "$tracer_pid" -ne 0 ]; then
+          tracer_name=$(ps -p $tracer_pid -o comm=)
+          echo "Proceso Trazado - PID: $pid, Nombre: $process_name, Tracer PID: $tracer_pid, Tracer Nombre: $tracer_name"
+        fi
+      fi
     fi
-  fi
-done < process_list.tmp
-
-# Eliminar el archivo temporal
-rm process_list.tmp
+  done < process_list.tmp
+  rm process_list.tmp
 }
 
 while [ -n "$1" ]; do
@@ -106,18 +105,21 @@ while [ -n "$1" ]; do
       exit
     ;;
     -nattch)
+      nattch='1'
       shift
       while [ -n "$1" ]; do
         if [[ $1 != -* ]]; then
-          findpid $1
-          nattch_procs+=($PID4)
+          nattch_lista+=($1)
           shift
         fi
       done
       ;;
       -pattch)
+        pattch="1"
+        shift
         while [ -n "$1" ]; do
-          pattch_procs+=($PID)
+          pattch_lista+=($1)
+          shift
         done
       ;;
     -k)
@@ -135,16 +137,24 @@ while [ -n "$1" ]; do
       prog=$1
     ;;
     *)
-      if [ -z "$prog" ] then
+      if [ -z "$prog" ]; then
         prog= $1
         shift
-      fi
       else
         usage
         exit 1
+      fi
     ;;
     esac
 done
+
+if [ -z "$v_aceptado" ]; then
+  inicio
+fi
+
+if [ -z "$vall_aceptado" ]; then
+  inicio
+fi
 
 if [ -n "$argumentos_sto" ]; then
   repositorio_request $prog
@@ -152,9 +162,27 @@ if [ -n "$argumentos_sto" ]; then
 fi
 
 if [ -n "$nattch" ]; then
-  repositorio_request
-  findpid $prog
-  strace -c -p $PID4 -o ./scdebug/$prog/trace_$UUIDGEN.txt
+  if [ -n "$argumentos_sto" ]; then
+    for name in "${nattch_lista[@]}"; do
+      repositorio_request $name
+      findpid $name
+      strace $argumentos_sto -p $PID4 -o ./scdebug/$name/trace_$(uuidgen).txt
+    done
+  else
+    for name in "${nattch_lista[@]}"; do
+      repositorio_request $name
+      findpid $name
+      strace -c -p $PID4 -o ./scdebug/$name/trace_$(uuidgen).txt
+    done
+  fi
+fi
+ 
+if [ -n "$pattch" ]; then
+  for PID in "${pattch_lista[@]}"; do
+    process_name $PID
+    repositorio_request $proceso_nombre
+    strace -c -p $PID -o ./scdebug/$proceso_nombre/trace_$UUIDGEN.txt&
+  done
 fi
 
 if [ -n "$v_aceptado" ]; then
