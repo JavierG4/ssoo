@@ -52,6 +52,7 @@ else
   mkdir ./scdebug/
   mkdir ./scdebug/$1
 fi
+UUIDGEN=$(uuidgen)
 }
 
 help1()
@@ -149,6 +150,7 @@ while [ -n "$1" ]; do
     ;;
     esac
 done
+inicio
 
 if [ -z "$v_aceptado" ]; then
   inicio
