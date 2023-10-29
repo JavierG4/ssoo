@@ -69,32 +69,18 @@ process_name()
 
 func_kill()
 {
- for pid in $(ps -u $USER -o pid); do
-    if [ -e /proc/"$pid"/status ]; then
-      PROCESO_TRAZADO=$(cat /proc/$pid/status | grep TracerPid: | awk '{print $2}' )
-      if [ "$PROCESO_TRAZADO" != "0" ]; then
-        kill $PROCESO_TRAZADO 2>/dev/null
-        if [ "$?" == "1" ]; then
-          echo " No pudo ser eliminado $PROCESO_TRAZADO"
-        fi        
-        kill $pid 2>/dev/null
-        if [ "$?" == "1" ]; then
-          echo " No pudo ser eliminado $pid"
-        fi
-      fi
-    fi
-  done
+ echo a
 }
 
 inicio2()
 {
-echo "----Estos programas estan siendo trazados----"
-for pid in "$(ps -u $USER -o pid)"; do
-  if [ -e "/proc/$pid/status" ]; then
-    tracer_pid=$(awk '/TracerPid/ {print $2}' /proc/$pid/status)
-    if [ "$tracer_pid" -ne 0 ]; then
-      tracer_name=$(ps -p $tracer_pid -o comm=)
-      echo "Proceso Trazado - PID: $pid, Nombre: $process_name, Tracer PID: $tracer_pid, Tracer Nombre: $tracer_name"
+for pid in "$(ps -U $USER -o pid)"; do
+  if [ -e /proc/"$pid"/status ]; then
+    tracer_process=$(cat /proc/Spid/status | grep TracerPid: | awk '(print $2]')
+    if [ "$tracer_process" != "0" ]; then
+      process1_name=$(ps -o comm= -p $pid)
+      tracer_name=$(ps -o comm= -p $tracer_process)
+      echo "$pid $process1_name SEGUIDO POR $tracer_process $tracer_name"
     fi
   fi
 done
@@ -109,7 +95,7 @@ current_user=$(whoami)
       if [ -e "/proc/$pid/status" ]; then
         tracer_pid=$(awk '/TracerPid/ {print $2}' /proc/$pid/status)
         if [ "$tracer_pid" -ne 0 ]; then
-         tracer_name=$(ps -p $tracer_pid -o comm=)
+          tracer_name=$(ps -p $tracer_pid -o comm=)
           echo "Proceso Trazado - PID: $pid, Nombre: $process_name, Tracer PID: $tracer_pid, Tracer Nombre: $tracer_name"
         fi
       fi
@@ -136,22 +122,23 @@ while [ -n "$1" ]; do
     -nattch)
       nattch='1'
       shift
-      while [ -n "$1" ] && [[ $1 != -* ]]; do
-        nattch_lista+=($1)
-        shift
+      while [ -n "$1" ]; do
+        if [[ $1 != -* ]]; then
+          nattch_lista+=($1)
+          shift
+        fi
       done
       ;;
       -pattch)
         pattch="1"
         shift
-        while [ -n "$1" ] && [[ $1 != -* ]]; do
+        while [ -n "$1" ]; do
           pattch_lista+=($1)
           shift
         done
       ;;
     -k)
       func_kill
-      exit
     ;;
 
     -v)
@@ -168,7 +155,7 @@ while [ -n "$1" ]; do
     ;;
     *)
       if [ -z "$prog" ]; then
-        prog=$1
+        prog= $1
         shift
       else
         usage
@@ -177,8 +164,13 @@ while [ -n "$1" ]; do
     ;;
     esac
 done
+inicio2
 
-if [ -z "$v_aceptado" ] || [ -z "$vall_aceptado" ]; then
+if [ -z "$v_aceptado" ]; then
+  inicio
+fi
+
+if [ -z "$vall_aceptado" ]; then
   inicio
 fi
 
@@ -211,22 +203,20 @@ if [ -n "$pattch" ]; then
   done
 fi
 
-if [ "$v_aceptado" = "1" ]; then
-  ruta="./scdebug/$prog"
-  nombre_traza=$(ls -t ./scdebug/$prog | head -n 1)
-  fecha=$(ls -l --time=atime ./scdebug/$prog/$nombre_traza | cut -d" " -f8)
-  echo "=============== COMMAND: $prog ======================="
-  echo "=============== TRACE FILE: $nombre_traza ================="
-  echo "=============== TIME: $fecha =============="
+if [ -n "$v_aceptado" ]; then
+  latest_file=$(ls -t "./scdebug/$prog"| head -1)
+  if [ -n "$latest_file" ]; then
+    echo "Contenido del archivo de depuración más reciente: $latest_file"
+    cat "$latest_file"
+  else
+    echo "No se encontraron archivos de depuración en el directorio."
+  fi
 fi
 
-if [ "$vall_aceptado" = "1" ]; then
+if [ -n "$vall_aceptado" ]; then
   for file in $(ls -t "./scdebug/$prog"); do
-    ruta="./scdebug/$prog"
-    fecha=$(ls -l --time=atime ./scdebug/$prog/$file | cut -d" " -f8)
-    echo "=============== COMMAND: $prog ======================="
-    echo "=============== TRACE FILE: $file ================="
-    echo "=============== TIME: $fecha =============="
-    echo " "
+    echo "Contenido del archivo de : $debug_file"
+    cat $debug_file
+    echo "=============================="
   done
 fi
