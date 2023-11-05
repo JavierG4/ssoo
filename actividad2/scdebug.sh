@@ -203,8 +203,8 @@ if [ -z "$v_aceptado" ] && [ -z "$vall_aceptado" ]; then
   inicio2
 fi
 
-if [ -n "$argumentos_sto" ] && [ -n $prog_solo ]; then
-  #echo "a"
+if [ -n "$argumentos_sto" ] && [ "$prog_solo_aceptado" = "1" ]; then
+  echo "a"
   repositorio_request $prog_solo
   ruta="./scdebug/$prog_solo/trace_$(uuidgen).txt"
   launch_strace_sinpid $ruta $argumentos_sto &
@@ -212,7 +212,7 @@ if [ -n "$argumentos_sto" ] && [ -n $prog_solo ]; then
 fi
 
 if [ -z "$argumentos_sto" ] && [ "$prog_solo_aceptado" = "1" ] && [ -z "$v_aceptado" ] && [ -z "$vall_aceptado" ] && [ -z $kill_aceptado ]; then
-  #echo c
+  echo c
   #echo $args
   repositorio_request $prog_solo
   ruta="./scdebug/$prog_solo/trace_$(uuidgen).txt"
