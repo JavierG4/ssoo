@@ -20,7 +20,6 @@ args=""
 kill_aceptado=
 prog_solo=
 prog_solo_aceptado=
-ruta=
 ##### Estilos
 #PID=$(ps -u | sort -n -k10 -r | grep $prog$ |  tail -n1 | tr -s " " " " | cut -f2 -d" ")
 #PID3=$(ps -u | tr -s " " " " | sort -n -k10 -r | grep $prog$ | head -n1 | cut -d " " -f2)
@@ -48,15 +47,20 @@ check_prog() {
   fi
 }
 
-launch_strace_sinpid() { #$2 args_sto $1destination si o no
-  #echo "launch2"
-  #echo $args
-  strace $2 -o $1 $prog_solo $args 2>&1 | tee -a ./scdebug/erores.txt
-}
-
-launch_strace() { #$1 Pid $3 args_sto $2 Destination
-  #echo "launch"
-  strace $3 -p $1 -o $2 2>&1 | tee -a ./scdebug/erores.txt
+launch_strace_p() { #$1 Pid $2 args_sto $3 Destination
+  if [ -n $1 ]; then # Que tenga -p
+    if [ -n $2 ]; then # Que tenga argumentos
+      strace $2 -p $1 -o $3 2>&1 | tee -a $3
+    else
+      strace -c -p $1 -o $3 2>&1 | tee -a $3
+    fi
+  else
+    if [ -n $2 ]; then # Que tenga argumentos
+      strace $2 -o $3 $prog_solo $args 2>&1 | tee -a $3
+    else
+      strace -o $3 $prog_solo $args 2>&1 | tee -a $3
+    fi
+  fi
 }
 
 
@@ -185,13 +189,12 @@ while [ -n "$1" ]; do
     ;;
     *)
       if [[ $1 != -* ]]; then
-        #echo "m"
         prog_solo_aceptado="1"
         prog_solo=$1
         shift
         while [[ $1 != "-pattch" && $1 != "-nattch" ]] && [ -n "$1" ]; do
           #echo "aqui"
-          args+=" "$1
+          args+=""$1
           shift
         done
       fi
@@ -203,41 +206,32 @@ if [ -z "$v_aceptado" ] && [ -z "$vall_aceptado" ]; then
   inicio2
 fi
 
-if [ -n "$argumentos_sto" ] && [ "$prog_solo_aceptado" = "1" ]; then
-  echo "a"
+if [ -n "$argumentos_sto" ] && [ -n $prog_solo ]; then
+  #echo "a"
   repositorio_request $prog_solo
-  ruta="./scdebug/$prog_solo/trace_$(uuidgen).txt"
-  launch_strace_sinpid $ruta $argumentos_sto &
-  #strace $argumentos_sto -o ./scdebug/$prog_solo/trace_$(uuidgen).txt $prog_solo $args &
+  strace $argumentos_sto -o ./scdebug/$prog_solo/trace_$(uuidgen).txt $prog_solo $args &
 fi
 
 if [ -z "$argumentos_sto" ] && [ "$prog_solo_aceptado" = "1" ] && [ -z "$v_aceptado" ] && [ -z "$vall_aceptado" ] && [ -z $kill_aceptado ]; then
   echo c
-  #echo $args
   repositorio_request $prog_solo
-  ruta="./scdebug/$prog_solo/trace_$(uuidgen).txt"
-  launch_strace_sinpid $ruta &
-  #strace -o ./scdebug/$prog_solo/trace_$(uuidgen).txt $prog_solo $args &
+  strace -o ./scdebug/$prog_solo/trace_$(uuidgen).txt $prog_solo $args &
 fi
 
 if [ -n "$nattch" ]; then
   if [ -n "$argumentos_sto" ]; then
     for name in "${nattch_lista[@]}"; do
-      #echo "c"
+      echo "c"
       repositorio_request $name
       findpid $name
-      ruta="./scdebug/$name/trace_$(uuidgen).txt"
-      launch_strace $PID4 $ruta $argumentos_sto &
-      #strace $argumentos_sto -p $PID4 -o ./scdebug/$name/trace_$(uuidgen).txt&
+      strace $argumentos_sto -p $PID4 -o ./scdebug/$name/trace_$(uuidgen).txt&
     done
   else
     for name in "${nattch_lista[@]}"; do
       #echo "d"
       repositorio_request $name
       findpid $name
-      ruta="./scdebug/$name/trace_$(uuidgen).txt"
-      launch_strace $PID4 $ruta &
-      #strace -c -p $PID4 -o ./scdebug/$name/trace_$(uuidgen).txt&
+      strace -c -p $PID4 -o ./scdebug/$name/trace_$(uuidgen).txt&
     done
   fi
 fi
@@ -248,18 +242,14 @@ if [ -n "$pattch" ]; then
       #echo "e"
       process_name $PID
       repositorio_request $proceso_nombre
-      ruta="./scdebug/$proceso_nombre/trace_$(uuidgen).txt"
-      launch_strace $PID $ruta $argumentos_sto &
-      #strace $argumentos_sto -p $PID -o ./scdebug/$proceso_nombre/trace_$(uuidgen).txt&
+      strace $argumentos_sto -p $PID -o ./scdebug/$proceso_nombre/trace_$(uuidgen).txt&
     done
   else
     for PID in "${pattch_lista[@]}"; do
-      #echo "r"
+      echo "r"
       process_name $PID
       repositorio_request $proceso_nombre
-      ruta="./scdebug/$proceso_nombre/trace_$(uuidgen).txt"
-      launch_strace $PID $ruta &
-      #strace -c -p $PID -o ./scdebug/$proceso_nombre/trace_$(uuidgen).txt&
+      strace -c -p $PID -o ./scdebug/$proceso_nombre/trace_$(uuidgen).txt&
     done
   fi
 fi

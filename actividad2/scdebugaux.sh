@@ -72,6 +72,20 @@ func_kill()
  echo a
 }
 
+inicio2()
+{
+for pid in "$(ps -U $USER -o pid)"; do
+  if [ -e /proc/"$pid"/status ]; then
+    tracer_process=$(cat /proc/Spid/status | grep TracerPid: | awk '(print $2]')
+    if [ "$tracer_process" != "0" ]; then
+      process1_name=$(ps -o comm= -p $pid)
+      tracer_name=$(ps -o comm= -p $tracer_process)
+      echo "$pid $process1_name SEGUIDO POR $tracer_process $tracer_name"
+    fi
+  fi
+done
+}
+
 inicio()
 {
 current_user=$(whoami)
@@ -150,7 +164,7 @@ while [ -n "$1" ]; do
     ;;
     esac
 done
-inicio
+inicio2
 
 if [ -z "$v_aceptado" ]; then
   inicio
@@ -170,13 +184,13 @@ if [ -n "$nattch" ]; then
     for name in "${nattch_lista[@]}"; do
       repositorio_request $name
       findpid $name
-      strace $argumentos_sto -p $PID4 -o ./scdebug/$name/trace_$(uuidgen).txt
+      strace $argumentos_sto -p $PID4 -o ./scdebug/$name/trace_$(uuidgen).txt&
     done
   else
     for name in "${nattch_lista[@]}"; do
       repositorio_request $name
       findpid $name
-      strace -c -p $PID4 -o ./scdebug/$name/trace_$(uuidgen).txt
+      strace -c -p $PID4 -o ./scdebug/$name/trace_$(uuidgen).txt&
     done
   fi
 fi
