@@ -1,0 +1,2 @@
+strace: Process 23082 attached
+strace: Process 23073 attached
