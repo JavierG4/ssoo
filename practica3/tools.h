@@ -13,7 +13,10 @@
 #include <vector>
 #include <optional>
 #include <expected>
-
+#include <signal.h>
+#include <thread>
+#include <chrono>
+#include <atomic>
 // Modo de compilación : g++-13 netcp.cc tools.cc -std=c++23
 
 std::error_code netcp_send_file(const std::string&);
@@ -26,4 +29,6 @@ using make_socket_result = std::expected<int, std::error_code>;
 make_socket_result make_socket(std::optional<sockaddr_in>);
 std::error_code receive_from(int,std::vector<uint8_t>&,sockaddr_in&);
 std::error_code write_file(int, const std::vector<uint8_t>&);
-
+void segv_signal_handler(int);
+void term_signal_handler(int);
+std::string getenv(const std::string&);

@@ -1,8 +1,26 @@
 #include "tools.h"
 
 // Modo de compilación : g++-13 netcp.cc tools.cc -std=c++23
+// Modo escucha ./a.out -l receive
+// Modo mandar ./a.out testfile
+// E
+
 
 int main(int argc, char* argv[]) {
+  struct sigaction term_action = {0};
+  term_action.sa_handler = &term_signal_handler;
+  //term_action.sa_flags = SA_RESTART;
+
+  sigaction(SIGTERM, &term_action, NULL);
+  sigaction(SIGINT, &term_action, NULL);
+  sigaction(SIGHUP, &term_action, NULL);
+  sigaction(SIGQUIT, &term_action, NULL);
+
+  struct sigaction segv_action = {0};
+  segv_action.sa_handler = &segv_signal_handler;
+
+  sigaction(SIGSEGV, &segv_action, NULL);
+
   if(argc < 2) {   // comprobar si escribieron parametros de entrada
     std::cout << "----------------------------------------------------------" << std::endl;
     std::cout << " " << std::endl;
@@ -29,13 +47,16 @@ int main(int argc, char* argv[]) {
   std::string filename = argv[1];
   if (flag_receive == receive) {
     std::string filename2 = argv[2];
-    netcp_receive_file(filename2);
+    std::error_code error = netcp_receive_file(filename2);
+    if (error) {
+      std::cerr << "Ha habido un error en el netcp_receive y es este el error" << error.message() <<std::endl;
+    }
     //std::cout << " e";
   }
   else {
     std::error_code error = netcp_send_file(filename);
     if (error) {
-      std::cerr << "Ha habido un error a la hora de hacer la función read_file y este es el error" << std::endl;
+      std::cerr << "Ha habido un error a la hora de hacer la función read_file y este es el error" << error.message() <<std::endl;
     }
   }
 }

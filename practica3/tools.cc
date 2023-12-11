@@ -1,5 +1,8 @@
 #include "tools.h"
 
+std::atomic<bool> quit_request = false;
+int signal_flag = 15;
+
 std::error_code netcp_send_file(const std::string& filename) {
   std::expected<int, std::error_code> result = open_file(filename); // Abro el archivo 
   if (!result) {
@@ -15,6 +18,7 @@ std::error_code netcp_send_file(const std::string& filename) {
     if (!result_socket) {
       std::cerr << "Ha habido un error en la creación del socket" << std::endl;
     //std::cerr << result_socket.error().message() << std::endl;
+      close(fd);
       int close_result = close(*result_socket);
     //std::cout << close_result << std::endl;
       if (close_result != 0) {
@@ -22,40 +26,58 @@ std::error_code netcp_send_file(const std::string& filename) {
       }
       return std::error_code(errno, std::system_category());
     }
-    std::string address_make = "127.0.0.1";
-    auto address = make_ip_address(address_make, 8080);
-    int contador = 0;
+    std::string address_make;
+    uint16_t f_port;
+    if (getenv ("NETCP_IP") == NULL) {
+      address_make = "127.0.0.1";
+    } 
+    else {
+      address_make = getenv ("NETCP_IP");
+    }
+    if (getenv ("NETCP_PORT") == NULL) {
+      f_port = 8080;
+    }   
+    else {
+      f_port = static_cast<uint16_t>(std::stoi(getenv("NETCP_PORT")));
+    }
+    std::cout << address_make << " " << f_port << std::endl;
+    auto address = make_ip_address(address_make, f_port);
     if(address.has_value()) {
-      while(true) {
+      while(quit_request == false) {
         std::vector<uint8_t> buffer(1024);
-        read_file(fd, buffer); // Bytes > 0 sino error
+        std::error_code error_read = read_file(fd, buffer); // Bytes > 0 sino error
+        if ( error_read ) {
+          std::cout << " Error en el read " << error_read.message() <<std::endl;
+          close(fd);
+          close(*result_socket);
+          return std::error_code(errno, std::system_category());
+        }
+        //std::cout << buffer.size() << std::endl;
+        // Comrpobar error
         //std::cout << error.value() << std::endl;
         std::error_code error_sendto = send_to(*result_socket,buffer,address.value());
-        if( error_sendto.value() == 0) {
-          contador++;
+        // Tamaño buffer comprobar error
+        if (error_sendto) {
+          std::cout << "Error en el sendto" << error_sendto.message() << std::endl;
+          close(fd);
+          close(*result_socket);
+          return std::error_code(errno, std::system_category());
         }
-        if ( error_sendto.value() == 1) {
-          break;
+        if ( buffer.size() == 0) {
+          close(fd);
+          close(*result_socket);    
+          return std::error_code(0, std::system_category());
         }
+        std::this_thread::sleep_for(std::chrono::microseconds(2));
       }
-      
-      if ( contador > 1 ) {
-        int close_error = close(*result_socket);
-        if (close_error != 0 ) {
-          std::cerr << "Error al cerrar el socket" << std::endl;
-        }        
-        return std::error_code(0, std::system_category());
-      }
-      else {
-        int close_error = close(*result_socket);
-        if (close_error != 0 ) {
-          std::cerr << "Error al cerrar el socket" << std::endl;
-        }
-        return std::error_code(errno, std::system_category());
-      }
+      close(fd);
+      close(*result_socket);
+      std::cout << "Finished with Signal " << signal_flag << std::endl;
+      return std::error_code(errno, std::system_category());
     }
     else {
       std::cout << "Hubo un error al crear la ip con el Make_ip_address" << std::endl;
+      close(fd);
       int close_error = close(*result_socket);
       if (close_error != 0 ) {
         std::cerr << "Error al cerrar el socket" << std::endl;
@@ -66,40 +88,72 @@ std::error_code netcp_send_file(const std::string& filename) {
 }
 
 std::error_code netcp_receive_file(const std::string& filename) {
-  int fd = open(filename.c_str(), O_WRONLY | O_CREAT, 0666); 
-    //std::cout << "hola3" << std::endl;
-    std::expected<int, std::error_code> result_socket = make_socket(std::nullopt);
-    if (!result_socket) {
-      std::cerr << "Ha habido un error en la creación del socket" << std::endl;
+  int fd = open(filename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666); 
+  //std::cout << "hola3" << std::endl;
+  std::expected<int, std::error_code> result_socket = make_socket(std::nullopt);
+  if (!result_socket) {
+    std::cerr << "Ha habido un error en la creación del socket" << std::endl;
     //std::cerr << result_socket.error().message() << std::endl;
-      int close_result = close(*result_socket);
+    int close_result = close(*result_socket);
+    close(fd);
     //std::cout << close_result << std::endl;
-      if (close_result != 0) {
-        std::cerr << "error al cerrar el socket" << std::endl;
-      }
+    if (close_result != 0) {
+      std::cerr << "error al cerrar el socket" << std::endl;
+    }
+    return std::error_code(errno, std::system_category());
+  }
+  std::string address_make;
+  uint16_t f_port;  
+  if (getenv ("NETCP_IP") == NULL) {
+    address_make = "127.0.0.1";
+  } 
+  else {
+    address_make = getenv ("NETCP_IP");
+  }
+  if (getenv ("NETCP_PORT") == NULL) {
+    f_port = 8080;
+  }   
+  else {
+    f_port = static_cast<uint16_t>(std::stoi(getenv("NETCP_PORT")));
+  }
+  std::cout << address_make << " " << f_port << std::endl;
+  auto address = make_ip_address(address_make, f_port);    
+  bind(*result_socket,reinterpret_cast<const sockaddr*>(&address.value()),sizeof(address));
+  while (quit_request == false) {
+    std::vector<uint8_t> buffer(1024);
+    std::error_code error = receive_from(*result_socket, buffer ,address.value()); // Bytes > 0 sino error
+    std::cout << buffer.size() << std::endl;
+      //std::cout << "hola" << std::endl;
+      //std::cout << error.value() << std::endl;
+    if ( error ) {
+      std::cout << "Error en el receive " << error.message() << std::endl;
+      close(fd);
+      close(*result_socket);
+      std::cout << "Finished with Signal " << signal_flag << std::endl;
       return std::error_code(errno, std::system_category());
     }
-    std::string address_make = "127.0.0.1";
-    auto address = make_ip_address(address_make, 8080);    
-    bind(*result_socket,reinterpret_cast<const sockaddr*>(&address.value()),sizeof(address));
-    while (true) {
-      std::vector<uint8_t> buffer(1024);
-      std::error_code error = receive_from(*result_socket, buffer ,address.value()); // Bytes > 0 sino error
-      //std::cout << "hola" << std::endl;
-      std::cout << error.value() << std::endl;
-      if ( error.value() != 0 ) {
-        std::cout << " break" << std::endl;
-        break;
-      }
-      else {
-        write_file(fd,buffer);
-      }
+    if ( buffer.empty() ) {
+      std::cout << "Final de recibir" << std::endl;
+      close(fd);
+      close(*result_socket);
+      return std::error_code(0, std::system_category());
     }
-    return std::error_code(0, std::system_category());
+    std::error_code error_write = write_file(fd,buffer);
+    if ( error_write ) {
+      std::cout << "error en el write " << error_write.message() << std::endl;
+      close(fd);
+      close(*result_socket);
+      return std::error_code(errno, std::system_category());      
+    }
+  }
+  close(fd);
+  close(*result_socket);
+  std::cout << "Finished with Signal " << signal_flag << std::endl;
+  return std::error_code(errno, std::system_category());
 }
 
-std::expected<int, std::error_code> open_file(std::string file) {
-  int fd = open(file.c_str() ,O_RDONLY, 00007);
+std::expected<int, std::error_code> open_file(std::string file) { // Flag int 0 1
+  int fd = open(file.c_str() ,O_RDONLY);
   if (fd == -1) {
     std::error_code error(errno, std::system_category());
     return std::unexpected(error); // Aquí está la corrección
@@ -113,9 +167,6 @@ std::error_code send_to(int fd, std::vector<uint8_t>& message, sockaddr_in& addr
   if (bytes_sent < 0) {
 // Error al enviar el mensaje.
     return std::error_code(errno, std::system_category());
-  }
-  if (bytes_sent == 0) {
-    return std::error_code(1, std::system_category());
   }
   return std::error_code(0, std::system_category());
 }
@@ -160,9 +211,9 @@ make_socket_result make_socket(std::optional<sockaddr_in> address = std::nullopt
 std::error_code receive_from(int fd,std::vector<uint8_t>& message, sockaddr_in& address) {
   socklen_t src_len = sizeof(address);
   int bytes_read = recvfrom(fd, message.data(), message.size(), 0,reinterpret_cast<sockaddr*>(&address), &src_len);
-  std::cout << "Receive " << bytes_read << std::endl;
+  //std::cout << "Receive " << bytes_read << std::endl;
   //std::cout << "hola" << std::endl;
-  if (bytes_read <= 0) {
+  if (bytes_read < 0) {
     return std::error_code(errno, std::system_category());
   }
   message.resize(bytes_read);
@@ -173,33 +224,55 @@ std::error_code receive_from(int fd,std::vector<uint8_t>& message, sockaddr_in& 
 
 std::error_code write_file(int fd, const std::vector<uint8_t>& buffer) {
   int bytes_received = write(fd, buffer.data(), buffer.size());
-  std::cout << "Write " << bytes_received << std::endl;
+  //std::cout << "Write " << bytes_received << std::endl;
   if (bytes_received < 0) {
 // Error al escribir el mensaje
     return std::error_code(errno, std::system_category());
   }
   return std::error_code(0, std::system_category());
 }
+void term_signal_handler(int signum) {
+  const char *message;
+  if (signum == SIGTERM) {
+    message = "Señal SIGTERM recibida.\n";
+    signal_flag = SIGTERM;
+  }
+  else if (signum == SIGINT) {
+    message = "Señal SIGINT recibida.\n";
+    signal_flag = SIGINT;
+  }
+  else if (signum == SIGQUIT) {
+    message = "Señal SIGQUIT recibida.\n";
+    signal_flag = SIGQUIT;
+  }
+  else if(signum == SIGHUP) {
+    message = "Señal SIGUP recibida .\n";
+    signal_flag = SIGHUP;
+  }
+  else {
+    message = "Señal desconocida recibida.\n";
+  }
+  quit_request = true;
+  write(STDOUT_FILENO, message, strlen(message));
+}
 
+void segv_signal_handler(int signum) {
+    const char* message = "¡Algo ha ido mal! Señal SIGSEGV recibida.\n";
+    write( STDOUT_FILENO, message, strlen(message));
+    quit_request = true;
+    // No podemos ignorar el problema porque si salimos de aquí sin hacer nada se reintentará la instrucción que causo
+    // el error, devolviéndonos aquí de nuevo, indefinidamente.
+    //
+    // Lo interesante es que esta señal nos da la oportunidad de hacer cosas críticas antes de terminar.
+    exit(1);
+}
 
-
-/*        if (error_sendto ) {
-          std::cerr << "Ha habido un error a la hora de hacer la función send_to que envia el mensaje y este es el error" << std::endl;
-          std::cerr << error.message() << std::endl;
-          int close_error = close(*result_socket);
-          if (close_error != 0 ) {
-            std::cerr << "error al cerrar el socket" << std::endl;
-          }
-          return std::error_code(errno, std::system_category());
-        }
-        else {
-          int close_error = close(*result_socket);
-          if (close_error != 0 ) {
-            std::cerr << "error al cerrar el socket" << std::endl;
-            return std::error_code(errno, std::system_category());
-          }
-          else {
-            std::cout << "Correcto" << std::endl;
-            return std::error_code(0, std::system_category());
-          }
-        }*/
+std::string getenv(const std::string& name) {
+  char* value = getenv(name.c_str());
+  if (value) {
+    return std::string(value);
+  }
+  else {
+    return std::string();
+  }
+}
